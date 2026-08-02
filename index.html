@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>マイジャグラーV 設定推測ツール v1.8</title>
+<title>マイジャグラーV 設定推測ツール v1.9</title>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#0f6e56">
 <meta name="description" content="マイジャグラーVの設定推測と、収支・交通費・拘束時間・店情報の記録">
@@ -122,12 +122,19 @@
     display:flex; flex-wrap:wrap; gap:12px; color:var(--sub); }
   .shopItem .stat b { color:var(--ink); }
   .shopItem .acts { white-space:nowrap; font-weight:400; }
+  /* 地図まわり */
+  .mapLinks { display:flex; gap:14px; margin-top:6px; }
+  .mapLinks a { font-size:12px; color:var(--blue); text-decoration:none; font-weight:600; }
+  .mapLinks a::before { content:"↗ "; opacity:.6; font-weight:400; }
+  .placeInfo { font-size:12px; border-radius:8px; padding:0; margin:0 0 12px; }
+  .placeInfo.ok { background:var(--blue-bg); color:var(--blue); padding:10px 12px; }
+  .placeInfo.warn { background:var(--amber-bg); color:var(--amber); padding:10px 12px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>マイジャグラーV 設定推測ツール</h1>
-  <p class="lead">v1.8 ／ 「線を引き、結果で線を引き直す」</p>
+  <p class="lead">v1.9 ／ 「線を引き、結果で線を引き直す」</p>
 
   <!-- ホーム画面へ追加する案内（対象の環境でのみ出る） -->
   <div class="installBar" id="installBar">
@@ -216,7 +223,8 @@
       <div class="field"><label>終了時刻</label><input type="time" id="recEnd"></div>
     </div>
     <div class="field"><label>店名<span class="hint">（店管理タブで登録した店から選択）</span></label>
-      <select id="recShop"><option value="">（未選択）</option></select></div>
+      <select id="recShop" onchange="updateRecShopLinks()"><option value="">（未選択）</option></select>
+      <div id="recShopLinks"></div></div>
     <div id="noShopHint" class="disclaimer" style="display:none;margin:-8px 0 12px;">
       まだ店が登録されていません。「店管理」タブから登録すると、ここで選べるようになります。</div>
     <div class="field"><label>台番号（任意）</label>
@@ -274,6 +282,12 @@
     <h2><span><span class="badge" style="background:var(--blue-bg);color:var(--blue);">◈</span><span id="shopFormTitle">店を登録する</span></span></h2>
     <div class="field"><label>店名<span class="hint">（必須）</span></label>
       <input type="text" id="shopName" placeholder="例：〇〇店 △△本店"></div>
+    <button class="btn-ghost" onclick="openMapSearch()">Googleマップで探す</button>
+    <div class="field" style="margin-top:12px;">
+      <label>マップから取り込む<span class="hint">（任意・地図で店を開き「共有」でコピーして貼り付け）</span></label>
+      <textarea id="shopPlace" placeholder="コピーした内容をそのまま貼り付け&#10;例：〇〇会館 △△店 · 東京都…&#10;https://maps.app.goo.gl/…" oninput="onPlacePaste()"></textarea>
+    </div>
+    <div id="shopPlaceInfo" class="placeInfo"></div>
     <div class="field"><label>マイジャグラーV 設置台数<span class="hint">（任意）</span></label>
       <input type="number" id="shopUnits" inputmode="numeric" min="0" placeholder="例：20"></div>
     <div class="field"><label>メモ<span class="hint">（イベント傾向・狙い目・並び など）</span></label>
@@ -592,6 +606,133 @@ function buildCalc(g, big, reg, regDenom, budouDenom, verdict, conf) {
     conf: (conf === undefined ? null : conf) };
 }
 
+// ===== Googleマップからの取り込み =====
+// APIキーは使わない。地図で開いた店の「共有」テキストやURLを貼ってもらい、
+// そこから読み取れるものだけを取り込む方式。
+const MAP_HOST = /^(?:www\.)?google\.[a-z.]+$|^maps\.google\.[a-z.]+$|^maps\.app\.goo\.gl$|^goo\.gl$/i;
+
+function safeDecode(s) {
+  try { return decodeURIComponent(s); } catch (e) { return s; }
+}
+// javascript: などを弾き、Googleマップのリンクだけを受け付ける
+function safeMapUrl(raw) {
+  if (!raw) return '';
+  let u;
+  try { u = new URL(String(raw)); } catch (e) { return ''; }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
+  if (!MAP_HOST.test(u.hostname)) return '';
+  if (/^goo\.gl$/i.test(u.hostname) && !/^\/maps\//.test(u.pathname)) return '';
+  return u.href;
+}
+const isCoordText = s => /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(s);
+
+// 貼り付けられた文字列から 店名・住所・URL・座標・場所ID を拾えるだけ拾う
+function parseMapPaste(text) {
+  const res = { name: '', address: '', url: '', lat: null, lng: null, placeId: '' };
+  const t = String(text || '').trim();
+  if (!t) return res;
+
+  const m = t.match(/https?:\/\/[^\s<>"']+/);
+  const url = m ? safeMapUrl(m[0]) : '';
+  res.url = url;
+
+  // URL以外の行を「店名 · 住所」とみなす（共有テキストがこの形になる）
+  let rest = (m ? t.replace(m[0], ' ') : t).replace(/\s+/g, ' ').trim();
+  // 「スキーム:」で始まる残りかすは店名として扱わない（javascript: など）
+  if (rest && !isCoordText(rest) && !/^[a-z][a-z0-9+.-]*:/i.test(rest)) {
+    const parts = rest.split(/\s*[·・]\s*/);
+    res.name = parts[0].trim();
+    if (parts.length > 1) res.address = parts.slice(1).join(' ').trim();
+  }
+
+  if (url) {
+    const u = new URL(url);
+    // https://www.google.com/maps/place/<店名>/@lat,lng,17z/...
+    const pm = u.pathname.match(/\/maps\/place\/([^\/@]+)/);
+    if (pm) {
+      const decoded = safeDecode(pm[1]).replace(/\+/g, ' ').trim();
+      if (decoded && !isCoordText(decoded) && !res.name) res.name = decoded;
+    }
+    const at = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (at) { res.lat = parseFloat(at[1]); res.lng = parseFloat(at[2]); }
+    // !3d<lat>!4d<lng> 形式（placeのdataパラメータ）
+    if (res.lat === null) {
+      const d = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+      if (d) { res.lat = parseFloat(d[1]); res.lng = parseFloat(d[2]); }
+    }
+    const q = u.searchParams.get('q') || u.searchParams.get('query') || '';
+    const pid = u.searchParams.get('query_place_id') || u.searchParams.get('place_id') ||
+      (q.indexOf('place_id:') === 0 ? q.slice(9) : '');
+    if (pid) res.placeId = pid;
+    if (res.lat === null && isCoordText(q)) {
+      const c = q.split(','); res.lat = parseFloat(c[0]); res.lng = parseFloat(c[1]);
+    }
+    if (!res.name && q && q.indexOf('place_id:') !== 0 && !isCoordText(q)) res.name = q;
+  } else if (isCoordText(t)) {
+    const c = t.split(','); res.lat = parseFloat(c[0]); res.lng = parseFloat(c[1]);
+  }
+  return res;
+}
+
+// 保存済みの店から「地図で開く」URLを作る。貼られたURLがあればそれを最優先
+function shopMapUrl(s) {
+  if (s.mapUrl) return s.mapUrl;
+  if (s.placeId) return 'https://www.google.com/maps/search/?api=1&query=' +
+    encodeURIComponent(s.name || '') + '&query_place_id=' + encodeURIComponent(s.placeId);
+  if (s.lat != null && s.lng != null)
+    return 'https://www.google.com/maps/search/?api=1&query=' + s.lat + ',' + s.lng;
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.name || '');
+}
+// 経路。短縮URLは目的地に使えないので座標・場所ID・店名の順で組む
+function shopDirUrl(s) {
+  let dest;
+  if (s.lat != null && s.lng != null) dest = s.lat + ',' + s.lng;
+  else dest = encodeURIComponent(s.name || '');
+  return 'https://www.google.com/maps/dir/?api=1&destination=' + dest +
+    (s.placeId ? '&destination_place_id=' + encodeURIComponent(s.placeId) : '');
+}
+function hasPlace(s) {
+  return !!(s && (s.mapUrl || s.placeId || (s.lat != null && s.lng != null) || s.name));
+}
+function mapLinksHtml(s) {
+  if (!hasPlace(s)) return '';
+  return '<div class="mapLinks">' +
+    '<a href="' + esc(shopMapUrl(s)) + '" target="_blank" rel="noopener noreferrer">地図</a>' +
+    '<a href="' + esc(shopDirUrl(s)) + '" target="_blank" rel="noopener noreferrer">経路</a></div>';
+}
+
+function openMapSearch() {
+  const n = document.getElementById('shopName').value.trim();
+  const q = n || 'パチンコ';
+  window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q),
+    '_blank', 'noopener');
+}
+
+// 貼り付けの内容をその場で解釈して、拾えたものを知らせる
+function onPlacePaste() {
+  const raw = document.getElementById('shopPlace').value;
+  const box = document.getElementById('shopPlaceInfo');
+  const nameEl = document.getElementById('shopName');
+  if (!raw.trim()) { box.className = 'placeInfo'; box.innerHTML = ''; return; }
+  const p = parseMapPaste(raw);
+  if (!p.url && p.lat === null && !p.name) {
+    box.className = 'placeInfo warn';
+    box.textContent = 'Googleマップのリンクが見つかりません。地図で店を開き「共有」→リンクをコピーして貼り付けてください。';
+    return;
+  }
+  if (p.name && !nameEl.value.trim()) nameEl.value = p.name; // 店名が空なら埋める
+  const got = [];
+  if (p.name) got.push('店名');
+  if (p.address) got.push('住所');
+  if (p.lat !== null) got.push('位置');
+  if (p.placeId) got.push('場所ID');
+  if (p.url) got.push('地図リンク');
+  box.className = 'placeInfo ok';
+  box.innerHTML = '取り込めるもの：' + (got.length ? got.join('・') : 'なし') +
+    (p.name ? '<br>' + esc(p.name) : '') + (p.address ? '<br>' + esc(p.address) : '') +
+    (p.lat === null && p.url ? '<br><span style="opacity:.8;">※短縮リンクのため位置は読めません。地図・経路は開けます</span>' : '');
+}
+
 // ===== 店マスタ =====
 let shopsCache = null;
 const writeShops = makeWriter(SHOP_KEY);
@@ -615,14 +756,21 @@ function saveShop() {
   const dup = shops.find(s => s.name === name && s.id !== editingShopId);
   if (dup) { showMsg('同じ店名がすでに登録されています'); return; }
 
+  const p = parseMapPaste(document.getElementById('shopPlace').value);
+  const place = { mapUrl: p.url, lat: p.lat, lng: p.lng, address: p.address, placeId: p.placeId };
+
   if (editingShopId) {
     const s = shops.find(x => x.id === editingShopId);
-    if (s) { s.name = name; s.units = units; s.memo = memo; }
+    if (s) {
+      s.name = name; s.units = units; s.memo = memo;
+      // 貼り直したときだけ場所を更新（空欄なら今の場所を消さずに残す）
+      if (p.url || p.lat !== null || p.placeId) Object.assign(s, place);
+    }
     persistShops(shops);
     cancelShopEdit();
     showMsg('店の情報を更新しました');
   } else {
-    shops.push({ id: Date.now(), name, units, memo });
+    shops.push(Object.assign({ id: Date.now(), name, units, memo }, place));
     persistShops(shops);
     clearShopForm();
     showMsg('店を登録しました');
@@ -634,6 +782,9 @@ function clearShopForm() {
   document.getElementById('shopName').value = '';
   document.getElementById('shopUnits').value = '';
   document.getElementById('shopMemo').value = '';
+  document.getElementById('shopPlace').value = '';
+  const box = document.getElementById('shopPlaceInfo');
+  box.className = 'placeInfo'; box.innerHTML = '';
 }
 function editShop(id) {
   const s = shopById(id);
@@ -642,6 +793,14 @@ function editShop(id) {
   document.getElementById('shopName').value = s.name;
   document.getElementById('shopUnits').value = (s.units === null || s.units === undefined) ? '' : s.units;
   document.getElementById('shopMemo').value = s.memo || '';
+  document.getElementById('shopPlace').value = s.mapUrl || '';
+  const box = document.getElementById('shopPlaceInfo');
+  if (hasPlace(s) && (s.mapUrl || s.lat != null)) {
+    box.className = 'placeInfo ok';
+    box.innerHTML = '登録済みの場所：' + (s.address ? esc(s.address) :
+      (s.lat != null ? s.lat.toFixed(5) + ', ' + s.lng.toFixed(5) : '地図リンクあり')) +
+      '<br><span style="opacity:.8;">貼り直すと更新、空欄のままなら今の場所を残します</span>';
+  } else { box.className = 'placeInfo'; box.innerHTML = ''; }
   document.getElementById('shopFormTitle').textContent = '店の情報を編集';
   document.getElementById('shopSaveLabel').textContent = '変更を保存する';
   document.getElementById('shopCancelBtn').style.display = 'block';
@@ -682,6 +841,15 @@ function refreshShopSelect() {
   sel.innerHTML = html;
   if (keep && shops.some(s => String(s.id) === keep)) sel.value = keep;
   document.getElementById('noShopHint').style.display = shops.length ? 'none' : 'block';
+  updateRecShopLinks();
+}
+// 選んだ店の地図・経路をその場で開けるように
+function updateRecShopLinks() {
+  const box = document.getElementById('recShopLinks');
+  if (!box) return;
+  const v = document.getElementById('recShop').value;
+  const s = v ? shopById(parseInt(v, 10)) : null;
+  box.innerHTML = s ? mapLinksHtml(s) : '';
 }
 
 // ===== ② 記録保存 =====
@@ -1028,7 +1196,9 @@ function renderShops() {
       '<div class="nm"><span>' + esc(s.name) + '</span>' +
       '<span class="acts"><span class="edit" onclick="editShop(' + s.id + ')">編集</span>' +
       '<span class="del" onclick="deleteShop(' + s.id + ')">削除</span></span></div>' +
-      '<div class="meta">マイジャグラーV ' + (s.units ? s.units + '台設置' : '設置台数未登録') + '</div>' +
+      '<div class="meta">マイジャグラーV ' + (s.units ? s.units + '台設置' : '設置台数未登録') +
+      (s.address ? '<br>' + esc(s.address) : '') + '</div>' +
+      mapLinksHtml(s) +
       (s.memo ? '<div class="memo">' + esc(s.memo) + '</div>' : '') +
       statHtml + '</div>';
   });
@@ -1087,10 +1257,16 @@ function sortByDateDesc(arr) {
 
 function sanitizeShop(s, seedList) {
   if (!s || !str(s.name).trim()) return null;
+  const lat = num(s.lat, null), lng = num(s.lng, null);
   return { id: num(s.id, 0) || nextId(seedList),
     name: str(s.name).trim(),
     units: num(s.units, null),
-    memo: str(s.memo) };
+    memo: str(s.memo),
+    // 取り込んだJSONにも変なURLが混じり得るので、ここでも検査する
+    mapUrl: safeMapUrl(s.mapUrl),
+    lat: (lat !== null && lng !== null) ? lat : null,
+    lng: (lat !== null && lng !== null) ? lng : null,
+    address: str(s.address), placeId: str(s.placeId) };
 }
 function sanitizeRecord(r) {
   if (!r || !isDate(r.date)) return null;
@@ -1215,6 +1391,10 @@ function runImport(mode) {
       // 既存が空欄のところだけ補う（入力済みの内容は上書きしない）
       if (sameName.units == null && s.units != null) sameName.units = s.units;
       if (!sameName.memo && s.memo) sameName.memo = s.memo;
+      if (!sameName.mapUrl && s.mapUrl) sameName.mapUrl = s.mapUrl;
+      if (!sameName.address && s.address) sameName.address = s.address;
+      if (!sameName.placeId && s.placeId) sameName.placeId = s.placeId;
+      if (sameName.lat == null && s.lat != null) { sameName.lat = s.lat; sameName.lng = s.lng; }
       return;
     }
     let nid = s.id;

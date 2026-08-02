@@ -1,6 +1,6 @@
 // マイジャグラーV 設定推測ツール — オフライン用サービスワーカー
 // 版を上げると古いキャッシュを捨てて入れ替わる
-const CACHE = 'myjuggler-v1.8.0';
+const CACHE = 'myjuggler-v1.9.0';
 const ASSETS = [
   './',
   './index.html',
