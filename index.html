@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>マイジャグラーV 設定推測ツール v1.6</title>
+<style>
+  :root {
+    --bg: #f4f2ec; --card: #ffffff; --ink: #2c2c2a; --sub: #6b6a64; --line: #ddd9cf;
+    --teal: #0f6e56; --teal-bg: #e1f5ee; --amber: #854f0b; --amber-bg: #faeeda;
+    --red: #a32d2d; --red-bg: #fcebeb; --gray-bg: #f1efe8; --purple: #534ab7; --purple-bg:#eeedfe;
+    --blue: #185fa5; --blue-bg: #e6f1fb;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    margin: 0; background: var(--bg); color: var(--ink); line-height: 1.7; padding: 16px; }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin: 8px 0 4px; }
+  .lead { color: var(--sub); font-size: 13px; margin: 0 0 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; font-weight: 600; margin: 0 0 14px; display:flex; align-items:center; justify-content:space-between; }
+  .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; margin-right: 6px; background: var(--teal-bg); color: var(--teal); }
+  .gear { font-size:12px; color:var(--sub); cursor:pointer; font-weight:400; background:none; width:auto; padding:4px 8px; margin:0; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; color: var(--sub); margin-bottom: 4px; }
+  .field .hint { font-size:11px; color:var(--sub); font-weight:400; }
+  input[type="number"], input[type="date"], input[type="time"], input[type="text"], select, textarea {
+    width: 100%; padding: 10px 12px; font-size: 16px; border: 1px solid var(--line);
+    border-radius: 8px; background: #fff; color: var(--ink); font-family: inherit; }
+  textarea { resize: vertical; min-height: 64px; line-height: 1.6; }
+  .calc-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .calc-row:last-child { border-bottom: none; }
+  .calc-row .val { font-weight: 600; }
+  .verdict { margin-top: 14px; padding: 14px; border-radius: 10px; font-size: 14px; text-align: center; font-weight: 600; }
+  .v-hold { background: var(--gray-bg); color: var(--sub); }
+  .v-prov { background: var(--amber-bg); color: var(--amber); }
+  .v-clear { background: var(--teal-bg); color: var(--teal); }
+  .v-under { background: var(--red-bg); color: var(--red); }
+  .v-note { font-size: 12px; font-weight: 400; margin-top: 6px; }
+  button { width: 100%; padding: 12px; font-size: 15px; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; margin-top: 4px; }
+  .btn-primary { background: var(--teal); color: #fff; }
+  .btn-ghost { background: var(--gray-bg); color: var(--ink); }
+  .summary { display: flex; gap: 8px; margin-bottom: 10px; }
+  .summary .box { flex: 1; background: var(--gray-bg); border-radius: 10px; padding: 10px 6px; text-align: center; }
+  .summary .box .num { font-size: 16px; font-weight: 600; }
+  .summary .box .lbl { font-size: 10px; color: var(--sub); }
+  .summary .box.hi { background: var(--teal-bg); }
+  .pos { color: var(--teal); } .neg { color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 8px 6px; text-align: right; border-bottom: 1px solid var(--line); }
+  th { color: var(--sub); font-weight: 500; font-size: 11px; }
+  td:first-child, th:first-child { text-align: left; }
+  .sub-cell { display:block; font-size:10px; color:var(--sub); line-height:1.4; }
+  .empty { color: var(--sub); font-size: 13px; text-align: center; padding: 20px 0; }
+  .del { color: var(--red); cursor: pointer; font-size: 12px; }
+  .edit { color: var(--blue); cursor: pointer; font-size: 12px; margin-right: 10px; }
+  .disclaimer { font-size: 11px; color: var(--sub); margin-top: 4px; padding: 0 4px; }
+  .settings { background:var(--gray-bg); border-radius:10px; padding:14px; margin-bottom:14px; display:none; }
+  .settings.open { display:block; }
+  .settings .field { margin-bottom:10px; }
+  .settings .row2 { display:flex; gap:10px; }
+  .settings .row2 .field { flex:1; }
+  .settings .note { font-size:11px; color:var(--sub); margin:0 0 10px; }
+  .row2 { display:flex; gap:10px; }
+  .row2 > .field { flex:1; }
+  .lineBar { background:var(--teal); color:#fff; border-radius:12px; padding:12px 16px; margin-bottom:16px; }
+  .lineBar .ttl { font-size:11px; opacity:.85; margin-bottom:4px; }
+  .lineBar .vals { font-size:14px; font-weight:600; display:flex; flex-wrap:wrap; gap:14px; }
+  .lineBar .vals span { white-space:nowrap; }
+  .modalBg { position:absolute; inset:0; min-height:100vh; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; z-index:20; padding:20px; }
+  .modalBg.open { display:flex; }
+  .modal { background:var(--card); border-radius:14px; padding:20px; max-width:340px; width:100%; }
+  .modal h3 { font-size:15px; font-weight:600; margin:0 0 10px; }
+  .modal p { font-size:13px; color:var(--sub); margin:0 0 16px; }
+  .modal .btns { display:flex; gap:10px; }
+  .modal .btns button { margin:0; }
+  .warnBox { background:var(--amber-bg); color:var(--amber); border-radius:10px; padding:12px; font-size:12px; margin:14px 0; }
+  .infoBox { background:var(--blue-bg); color:var(--blue); border-radius:10px; padding:12px; font-size:12px; margin:0 0 14px; }
+  /* タブ */
+  .tabs { display:flex; gap:6px; background:var(--gray-bg); border-radius:12px; padding:4px; margin-bottom:16px; }
+  .tabs button { flex:1; margin:0; padding:10px 8px; font-size:14px; background:transparent; color:var(--sub); border-radius:9px; }
+  .tabs button.active { background:var(--card); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .tabPane { display:none; }
+  .tabPane.active { display:block; }
+  /* 差額表示 */
+  .diffBox { background:var(--gray-bg); border-radius:10px; padding:12px 14px; display:flex;
+    justify-content:space-between; align-items:center; font-size:14px; margin-bottom:12px; }
+  .diffBox .lbl { color:var(--sub); font-size:13px; }
+  .diffBox .num { font-size:18px; font-weight:600; }
+  /* 店カード */
+  .shopItem { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+  .shopItem .nm { font-size:14px; font-weight:600; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .shopItem .meta { font-size:11px; color:var(--sub); margin-top:2px; }
+  .shopItem .memo { font-size:12px; color:var(--ink); margin-top:6px; white-space:pre-wrap; word-break:break-word; }
+  .shopItem .stat { font-size:12px; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);
+    display:flex; flex-wrap:wrap; gap:12px; color:var(--sub); }
+  .shopItem .stat b { color:var(--ink); }
+  .shopItem .acts { white-space:nowrap; font-weight:400; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>マイジャグラーV 設定推測ツール</h1>
+  <p class="lead">v1.6 ／ 「線を引き、結果で線を引き直す」</p>
+
+  <!-- タブ -->
+  <div class="tabs">
+    <button id="tabBtnPlay" class="active" onclick="switchTab('play')">立ち回り</button>
+    <button id="tabBtnShop" onclick="switchTab('shop')">店管理</button>
+  </div>
+
+  <!-- ===================== 立ち回りタブ ===================== -->
+  <div class="tabPane active" id="tabPlay">
+
+  <!-- 現在のライン（固定表示・編集不可） -->
+  <div class="lineBar">
+    <div class="ttl">打つと判断するライン（現在の基準）</div>
+    <div class="vals" id="lineBarVals"></div>
+  </div>
+
+  <!-- 移動記録（拘束時間・交通費・独立記録） -->
+  <div class="card">
+    <h2><span><span class="badge" style="background:var(--blue-bg);color:var(--blue);">◍</span>移動・拘束の記録</span></h2>
+    <div class="row2">
+      <div class="field"><label>移動開始</label><input type="time" id="moveStart"></div>
+      <div class="field"><label>移動終了</label><input type="time" id="moveEnd"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>日付</label><input type="date" id="moveDate"></div>
+      <div class="field"><label>交通費<span class="hint">（円・往復）</span></label>
+        <input type="number" id="moveFare" inputmode="numeric" min="0" placeholder="例：800"></div>
+    </div>
+    <button class="btn-ghost" onclick="saveMove()">この日の拘束時間を記録</button>
+    <p class="disclaimer">台を打たなかった日も記録できます。拘束時給の分母になり、交通費は最終収支から差し引かれます。</p>
+  </div>
+
+  <!-- ① 設定推測パート -->
+  <div class="card">
+    <h2><span><span class="badge">①</span>設定推測</span>
+      <button class="gear" onclick="toggleSettings()">⚙ ラインを調整</button></h2>
+
+    <div class="settings" id="settingsPanel">
+      <p class="note">③で振り返って、ここの数値を引き直します。変更は自動保存されます。</p>
+      <div class="field">
+        <label>本クリアの回転数<span class="hint"> G（暫定クリアは3000G固定）</span></label>
+        <input type="number" id="setThreshold" inputmode="numeric" oninput="saveSettings()">
+      </div>
+      <div class="field">
+        <label>REG判定ライン<span class="hint"> 1/□ より軽ければクリア</span></label>
+        <input type="number" id="setRegLine" inputmode="decimal" step="0.1" oninput="saveSettings()">
+      </div>
+      <p class="note" id="settingsSummary"></p>
+      <button class="btn-ghost" onclick="resetSettings()">初期値に戻す</button>
+    </div>
+
+    <div class="field"><label>総回転数（G）</label>
+      <input type="number" id="games" inputmode="numeric" placeholder="例：5000" oninput="calc()"></div>
+    <div class="field"><label>BIG回数</label>
+      <input type="number" id="big" inputmode="numeric" placeholder="例：20" oninput="calc()"></div>
+    <div class="field"><label>REG回数</label>
+      <input type="number" id="reg" inputmode="numeric" placeholder="例：18" oninput="calc()"></div>
+    <div class="field"><label>ブドウ回数<span class="hint"> 任意・空欄でOK</span></label>
+      <input type="number" id="budou" inputmode="numeric" placeholder="カウントできた場合のみ" oninput="calc()"></div>
+
+    <div id="calcArea" style="margin-top:14px; display:none;">
+      <div class="calc-row"><span>REG確率</span><span class="val" id="regRate">-</span></div>
+      <div class="calc-row"><span>合算確率</span><span class="val" id="gassanRate">-</span></div>
+      <div class="calc-row"><span>BIG : REG 比率</span><span class="val" id="brRatio">-</span></div>
+      <div class="calc-row" id="budouRow" style="display:none;"><span>ブドウ確率</span><span class="val" id="budouRate">-</span></div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+  </div>
+
+  <!-- ② 記録パート -->
+  <div class="card">
+    <h2><span><span class="badge" style="background:var(--purple-bg);color:var(--purple);">②</span>記録</span></h2>
+    <div class="field"><label>日付</label><input type="date" id="recDate"></div>
+    <div class="row2">
+      <div class="field"><label>開始時刻</label><input type="time" id="recStart"></div>
+      <div class="field"><label>終了時刻</label><input type="time" id="recEnd"></div>
+    </div>
+    <div class="field"><label>店名<span class="hint">（店管理タブで登録した店から選択）</span></label>
+      <select id="recShop"><option value="">（未選択）</option></select></div>
+    <div id="noShopHint" class="disclaimer" style="display:none;margin:-8px 0 12px;">
+      まだ店が登録されていません。「店管理」タブから登録すると、ここで選べるようになります。</div>
+    <div class="field"><label>台番号（任意）</label>
+      <input type="text" id="recMachine" placeholder="例：123"></div>
+    <div class="row2">
+      <div class="field"><label>支出<span class="hint">（円・投資）</span></label>
+        <input type="number" id="recExpense" inputmode="numeric" min="0" placeholder="例：20000" oninput="updateDiff()"></div>
+      <div class="field"><label>収入<span class="hint">（円・回収）</span></label>
+        <input type="number" id="recIncome" inputmode="numeric" min="0" placeholder="例：32000" oninput="updateDiff()"></div>
+    </div>
+    <div class="diffBox"><span class="lbl">差額（収入 − 支出）</span><span class="num" id="recDiff">¥0</span></div>
+    <button class="btn-primary" onclick="saveRecord()">この台を記録する</button>
+    <p class="disclaimer">※①の入力（回転数・BIG・REG・ブドウ・判定）も一緒に保存されます</p>
+  </div>
+
+  <!-- ③ 検証パート -->
+  <div class="card">
+    <h2><span><span class="badge" style="background:var(--amber-bg);color:var(--amber);">③</span>検証・振り返り</span></h2>
+    <div class="summary">
+      <div class="box"><div class="num" id="sumCount">0</div><div class="lbl">記録数</div></div>
+      <div class="box"><div class="num" id="sumWin">-</div><div class="lbl">勝率</div></div>
+      <div class="box"><div class="num" id="sumTotal">¥0</div><div class="lbl">台の収支合計</div></div>
+    </div>
+    <div class="summary">
+      <div class="box"><div class="num" id="sumFare">¥0</div><div class="lbl">交通費合計</div></div>
+      <div class="box hi"><div class="num" id="sumNet">¥0</div><div class="lbl">最終収支</div></div>
+      <div class="box"><div class="num" id="sumHourly">-</div><div class="lbl">拘束時給</div></div>
+    </div>
+    <p class="disclaimer" style="margin-bottom:14px;">最終収支＝台の収支合計 − 交通費合計／拘束時給＝最終収支 ÷ 拘束時間</p>
+    <table>
+      <thead><tr><th>日付</th><th>時間</th><th>G数</th><th>REG</th><th>判定</th><th>収支</th><th></th></tr></thead>
+      <tbody id="recList"></tbody>
+    </table>
+    <div id="emptyMsg" class="empty">まだ記録がありません</div>
+    <div id="tightWarn" class="warnBox" style="display:none;"></div>
+    <div id="lineSummary"></div>
+    <div id="moveListWrap" style="display:none;margin-top:16px;">
+      <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">移動・拘束の記録</div>
+      <table><tbody id="moveList"></tbody></table>
+    </div>
+    <button class="btn-ghost" style="margin-top:16px;" onclick="exportData()">データを書き出す（バックアップ）</button>
+  </div>
+
+  </div><!-- /tabPlay -->
+
+  <!-- ===================== 店管理タブ ===================== -->
+  <div class="tabPane" id="tabShop">
+
+  <div class="card">
+    <h2><span><span class="badge" style="background:var(--blue-bg);color:var(--blue);">◈</span><span id="shopFormTitle">店を登録する</span></span></h2>
+    <div class="field"><label>店名<span class="hint">（必須）</span></label>
+      <input type="text" id="shopName" placeholder="例：〇〇店 △△本店"></div>
+    <div class="field"><label>マイジャグラーV 設置台数<span class="hint">（任意）</span></label>
+      <input type="number" id="shopUnits" inputmode="numeric" min="0" placeholder="例：20"></div>
+    <div class="field"><label>メモ<span class="hint">（イベント傾向・狙い目・並び など）</span></label>
+      <textarea id="shopMemo" placeholder="例：ゾロ目の日に角2台が強い。旧イベ日は7のつく日。"></textarea></div>
+    <button class="btn-primary" onclick="saveShop()"><span id="shopSaveLabel">この店を登録する</span></button>
+    <button class="btn-ghost" id="shopCancelBtn" style="display:none;" onclick="cancelShopEdit()">編集をやめる</button>
+    <p class="disclaimer">店名は②の記録でプルダウンから選ぶので、表記ゆれが起きません。</p>
+  </div>
+
+  <div class="card">
+    <h2><span>登録した店と成績</span></h2>
+    <div class="infoBox">
+      店舗情報のネットからの自動取得は、技術的な制約と各サイトの規約上のリスクを考えて見送っています。
+      ここは自分の足で得た情報を貯める場所です。
+    </div>
+    <div id="shopList"></div>
+    <div id="shopEmpty" class="empty">まだ店が登録されていません</div>
+  </div>
+
+  </div><!-- /tabShop -->
+
+  <p class="disclaimer">パチスロは長期的には店側が利益を出す設計です。このツールは不利を減らす立ち回りの補助であり、勝ちを保証するものではありません。</p>
+</div>
+
+<div class="modalBg" id="confirmModal">
+  <div class="modal">
+    <h3>まだ検証が浅いラインです</h3>
+    <p id="confirmText"></p>
+    <div class="btns">
+      <button class="btn-ghost" onclick="cancelLineChange()">やめる</button>
+      <button class="btn-primary" onclick="proceedLineChange()">変更する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 初期設定値（マイジャグラーV 設定4基準）=====
+const PROV_THRESHOLD = 3000; // 暫定クリア回転数（固定・編集不可）
+const DAYS_THRESHOLD = 3;     // 線変更に確認を挟むか判定する「通った日数」のしきい値
+const DEFAULTS = { threshold: 4500, regLine: 290.0 };
+const SET_KEY = 'myjuggler_settings_v1';
+const STORAGE_KEY = 'myjuggler_records_v1';
+const MOVE_KEY = 'myjuggler_moves_v1';       // 移動・拘束記録
+const MARKER_KEY = 'myjuggler_markers_v1';   // 線変更の区間マーカー
+const SHOP_KEY = 'myjuggler_shops_v1';       // 店マスタ
+
+// ===== ベイズ信頼度計算用：各設定のREG確率（1/x）=====
+const REG_THEORY = {1:409.6, 2:385.5, 3:336.1, 4:290.0, 5:268.6, 6:229.1};
+function logFactorial(n) {
+  let s = 0; for (let i = 2; i <= n; i++) s += Math.log(i); return s;
+}
+// 入力されたG数・REG回数から「設定4以上である確率(%)」を返す（設定均等仮定）
+function posteriorHigh(G, regCount) {
+  if (!regCount || regCount <= 0 || !G || G <= 0) return null;
+  const likes = {};
+  for (const s in REG_THEORY) {
+    const lam = G / REG_THEORY[s];
+    likes[s] = Math.exp(regCount * Math.log(lam) - lam - logFactorial(regCount));
+  }
+  let total = 0, high = 0;
+  for (const s in likes) { total += likes[s]; if (s >= 4) high += likes[s]; }
+  if (total === 0) return null;
+  return Math.round(high / total * 100);
+}
+
+let settings = loadSettings();
+let lastCalc = null;
+let editingShopId = null;
+
+// ===== タブ =====
+function switchTab(name) {
+  const play = name === 'play';
+  document.getElementById('tabPlay').classList.toggle('active', play);
+  document.getElementById('tabShop').classList.toggle('active', !play);
+  document.getElementById('tabBtnPlay').classList.toggle('active', play);
+  document.getElementById('tabBtnShop').classList.toggle('active', !play);
+  window.scrollTo(0, 0);
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SET_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      delete saved.provMult;       // 旧v1.1形式を除去
+      delete saved.provThreshold;  // 旧v1.2形式を除去（暫定は固定化）
+      return Object.assign({}, DEFAULTS, saved);
+    }
+  } catch (e) {}
+  return Object.assign({}, DEFAULTS);
+}
+function applySettingsToInputs() {
+  document.getElementById('setThreshold').value = settings.threshold;
+  document.getElementById('setRegLine').value = settings.regLine;
+  updateSettingsSummary();
+  updateLineBar();
+}
+let setTimer = null;
+function saveSettings() {
+  const t = parseFloat(document.getElementById('setThreshold').value);
+  const r = parseFloat(document.getElementById('setRegLine').value);
+  if (t > 0) settings.threshold = t;
+  if (r > 0) settings.regLine = r;
+  clearTimeout(setTimer);
+  setTimer = setTimeout(function attempt(tries){
+    try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); }
+    catch(e){ if((tries||0)<3) setTimeout(()=>attempt((tries||0)+1),200); }
+  }, 150);
+  updateSettingsSummary();
+  updateLineBar();
+  calc();
+  // 線変更の自動マーカー（入力が落ち着いてから、実際に変わっていれば記録）
+  clearTimeout(markerTimer);
+  markerTimer = setTimeout(checkAndMarkLineChange, 1200);
+}
+let markerTimer = null;
+// localStorageへの書き込みは遅延させるので、読み出しはメモリ上のキャッシュを正とする
+// （保存直後のrender()が古い内容を読んでしまうのを防ぐ）
+function readStore(key) {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : []; }
+  catch (e) { return []; }
+}
+function makeWriter(key) {
+  let timer = null;
+  return function (data) {
+    clearTimeout(timer);
+    timer = setTimeout(function attempt(tries) {
+      try { localStorage.setItem(key, JSON.stringify(data)); }
+      catch (e) { if ((tries || 0) < 3) setTimeout(() => attempt((tries || 0) + 1), 200); }
+    }, 150);
+  };
+}
+
+let markersCache = null;
+const writeMarkers = makeWriter(MARKER_KEY);
+function loadMarkers() {
+  if (!markersCache) markersCache = readStore(MARKER_KEY);
+  return markersCache;
+}
+function persistMarkers(markers) { markersCache = markers; writeMarkers(markers); }
+function checkAndMarkLineChange() {
+  const markers = loadMarkers();
+  const lastLine = markers.length ? markers[markers.length - 1] : null;
+  // 直近マーカーと同じ線なら何もしない
+  if (lastLine && lastLine.regLine === settings.regLine && lastLine.threshold === settings.threshold) return;
+
+  // 変更前の線（＝直前マーカーの線。無ければ初期値）での検証量を数える
+  const prev = lastLine ? { regLine: lastLine.regLine, threshold: lastLine.threshold }
+                        : { regLine: DEFAULTS.regLine, threshold: DEFAULTS.threshold };
+  const stats = currentSegmentStats(prev.regLine, prev.threshold);
+
+  // 5台未満 かつ 3日未満 のときだけ確認を挟む（どちらか達成なら確認なし）
+  if (stats.count < 5 && stats.days < DAYS_THRESHOLD) {
+    document.getElementById('confirmText').textContent =
+      '今の線（1/' + prev.regLine + '・' + prev.threshold + 'G）は、まだ ' +
+      stats.count + '台・' + stats.days + '日ぶんしか試していません。' +
+      '検証が浅いうちに変えると、どの線が良かったか分かりにくくなります。それでも変更しますか？';
+    document.getElementById('confirmModal').classList.add('open');
+    return; // ユーザーの選択待ち
+  }
+  commitLineChange();
+}
+
+function commitLineChange() {
+  const markers = loadMarkers();
+  markers.push({
+    id: Date.now(),
+    at: new Date().toISOString(),
+    regLine: settings.regLine,
+    threshold: settings.threshold
+  });
+  persistMarkers(markers);
+  render();
+  showMsg('ラインを 1/' + settings.regLine + ' / ' + settings.threshold + 'G に変更しました');
+}
+
+function proceedLineChange() {
+  document.getElementById('confirmModal').classList.remove('open');
+  commitLineChange();
+}
+
+function cancelLineChange() {
+  document.getElementById('confirmModal').classList.remove('open');
+  // 変更をやめる：変更前の線に戻す
+  const markers = loadMarkers();
+  const lastLine = markers.length ? markers[markers.length - 1] : null;
+  const prev = lastLine ? { regLine: lastLine.regLine, threshold: lastLine.threshold }
+                        : { regLine: DEFAULTS.regLine, threshold: DEFAULTS.threshold };
+  settings.regLine = prev.regLine;
+  settings.threshold = prev.threshold;
+  try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); } catch (e) {}
+  applySettingsToInputs();
+  calc();
+  showMsg('変更をやめました');
+}
+function updateSettingsSummary() {
+  document.getElementById('settingsSummary').textContent =
+    '暫定クリア ' + PROV_THRESHOLD.toLocaleString() + 'G ／ 本クリア ' +
+    settings.threshold.toLocaleString() + 'G ／ REG 1/' + settings.regLine + ' より軽ければ';
+}
+function updateLineBar() {
+  document.getElementById('lineBarVals').innerHTML =
+    '<span>REG 1/' + settings.regLine + ' より軽い</span>' +
+    '<span>暫定 ' + PROV_THRESHOLD.toLocaleString() + 'G〜</span>' +
+    '<span>本クリア ' + settings.threshold.toLocaleString() + 'G〜</span>';
+}
+function resetSettings() {
+  settings = Object.assign({}, DEFAULTS);
+  applySettingsToInputs(); saveSettings();
+}
+function toggleSettings() {
+  document.getElementById('settingsPanel').classList.toggle('open');
+}
+
+// ===== ① 計算 =====
+function calc() {
+  const g = parseInt(document.getElementById('games').value, 10);
+  const big = parseInt(document.getElementById('big').value, 10);
+  const reg = parseInt(document.getElementById('reg').value, 10);
+  const budou = parseInt(document.getElementById('budou').value, 10);
+  const area = document.getElementById('calcArea');
+
+  if (!g || g <= 0) { area.style.display = 'none'; lastCalc = null; return; }
+  area.style.display = 'block';
+
+  let regDenom = null, regRateTxt = '-';
+  if (reg && reg > 0) { regDenom = g / reg; regRateTxt = '1/' + regDenom.toFixed(1); }
+  document.getElementById('regRate').textContent = regRateTxt;
+
+  let gassanTxt = '-';
+  const totalBonus = (big || 0) + (reg || 0);
+  if (totalBonus > 0) gassanTxt = '1/' + (g / totalBonus).toFixed(1);
+  document.getElementById('gassanRate').textContent = gassanTxt;
+
+  let brTxt = '-';
+  if (big && reg && reg > 0) brTxt = (big / reg).toFixed(2) + ' : 1';
+  document.getElementById('brRatio').textContent = brTxt;
+
+  // ブドウ（任意）
+  const budouRow = document.getElementById('budouRow');
+  let budouDenom = null;
+  if (budou && budou > 0) {
+    budouDenom = g / budou;
+    document.getElementById('budouRate').textContent = '1/' + budouDenom.toFixed(2);
+    budouRow.style.display = 'flex';
+  } else {
+    budouRow.style.display = 'none';
+  }
+
+  const provThreshold = PROV_THRESHOLD;
+  const v = document.getElementById('verdict');
+
+  // 信頼度%（設定4以上である確率・均等仮定）。REGが入っていれば常に計算
+  const conf = posteriorHigh(g, reg);
+  const confLine = conf !== null
+    ? '<div class="v-note">設定4以上の期待度 <b>' + conf + '%</b><span style="opacity:.7">（設定均等仮定での目安）</span></div>'
+    : '';
+
+  if (g < provThreshold) {
+    v.className = 'verdict v-hold';
+    v.innerHTML = '判断保留<div class="v-note">' + Math.round(provThreshold).toLocaleString() +
+      'G未満はサンプル不足。あと' + Math.round(provThreshold - g).toLocaleString() + 'G</div>' + confLine;
+    lastCalc = buildCalc(g, big, reg, regDenom, budouDenom, '保留', conf);
+  } else if (regDenom === null) {
+    v.className = 'verdict v-hold';
+    v.innerHTML = 'REG回数を入力してください';
+    lastCalc = null;
+  } else {
+    const isClear = regDenom <= settings.regLine;
+    const isProvisional = g < settings.threshold;
+    let budouNote = '';
+    if (budouDenom !== null) {
+      budouNote = budouDenom <= 5.78
+        ? '<div class="v-note">ブドウ1/' + budouDenom.toFixed(2) + '＝設定4以上の水準で後押し</div>'
+        : '<div class="v-note">ブドウ1/' + budouDenom.toFixed(2) + '＝やや重い。REGと総合判断を</div>';
+    }
+    let sixNote = '';
+    if (big && reg && Math.abs(big / reg - 1) <= 0.15) {
+      sixNote = '<div class="v-note">BIG≒REGの同数ペース。設定6の可能性も</div>';
+    }
+
+    if (isClear && isProvisional) {
+      v.className = 'verdict v-prov';
+      v.innerHTML = '暫定クリア<div class="v-note">REGは軽い。ただし' +
+        settings.threshold.toLocaleString() + 'Gまではブレ幅大。継続して確認を</div>' + confLine + budouNote + sixNote;
+      lastCalc = buildCalc(g, big, reg, regDenom, budouDenom, '暫定クリア', conf);
+    } else if (isClear) {
+      v.className = 'verdict v-clear';
+      v.innerHTML = '設定4ラインクリア<div class="v-note">REGが1/' + settings.regLine +
+        'より軽い＝プラス域の期待</div>' + confLine + budouNote + sixNote;
+      lastCalc = buildCalc(g, big, reg, regDenom, budouDenom, 'クリア', conf);
+    } else {
+      v.className = 'verdict v-under';
+      v.innerHTML = '設定4に届かず<div class="v-note">REGが1/' + settings.regLine +
+        'より重い。低設定の可能性</div>' + confLine + budouNote;
+      lastCalc = buildCalc(g, big, reg, regDenom, budouDenom, '届かず', conf);
+    }
+  }
+}
+
+function buildCalc(g, big, reg, regDenom, budouDenom, verdict, conf) {
+  return { games: g, big: big || 0, reg: reg || 0,
+    regDenom: regDenom, budouDenom: budouDenom, verdict: verdict,
+    conf: (conf === undefined ? null : conf) };
+}
+
+// ===== 店マスタ =====
+let shopsCache = null;
+const writeShops = makeWriter(SHOP_KEY);
+function loadShops() {
+  if (!shopsCache) shopsCache = readStore(SHOP_KEY);
+  return shopsCache;
+}
+function persistShops(shops) { shopsCache = shops; writeShops(shops); }
+function shopById(id) {
+  return loadShops().find(s => s.id === id) || null;
+}
+function saveShop() {
+  const name = document.getElementById('shopName').value.trim();
+  const unitsRaw = document.getElementById('shopUnits').value;
+  const memo = document.getElementById('shopMemo').value.trim();
+  if (!name) { showMsg('店名を入力してください'); return; }
+  const units = unitsRaw === '' ? null : parseInt(unitsRaw, 10);
+  if (units !== null && (isNaN(units) || units < 0)) { showMsg('設置台数は0以上の数で入力してください'); return; }
+
+  const shops = loadShops();
+  const dup = shops.find(s => s.name === name && s.id !== editingShopId);
+  if (dup) { showMsg('同じ店名がすでに登録されています'); return; }
+
+  if (editingShopId) {
+    const s = shops.find(x => x.id === editingShopId);
+    if (s) { s.name = name; s.units = units; s.memo = memo; }
+    persistShops(shops);
+    cancelShopEdit();
+    showMsg('店の情報を更新しました');
+  } else {
+    shops.push({ id: Date.now(), name, units, memo });
+    persistShops(shops);
+    clearShopForm();
+    showMsg('店を登録しました');
+  }
+  renderShops();
+  refreshShopSelect();
+}
+function clearShopForm() {
+  document.getElementById('shopName').value = '';
+  document.getElementById('shopUnits').value = '';
+  document.getElementById('shopMemo').value = '';
+}
+function editShop(id) {
+  const s = shopById(id);
+  if (!s) return;
+  editingShopId = id;
+  document.getElementById('shopName').value = s.name;
+  document.getElementById('shopUnits').value = (s.units === null || s.units === undefined) ? '' : s.units;
+  document.getElementById('shopMemo').value = s.memo || '';
+  document.getElementById('shopFormTitle').textContent = '店の情報を編集';
+  document.getElementById('shopSaveLabel').textContent = '変更を保存する';
+  document.getElementById('shopCancelBtn').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+function cancelShopEdit() {
+  editingShopId = null;
+  clearShopForm();
+  document.getElementById('shopFormTitle').textContent = '店を登録する';
+  document.getElementById('shopSaveLabel').textContent = 'この店を登録する';
+  document.getElementById('shopCancelBtn').style.display = 'none';
+}
+function deleteShop(id) {
+  const used = loadRecords().filter(r => r.shopId === id).length;
+  const s = shopById(id);
+  const msg = used
+    ? '「' + (s ? s.name : '') + '」には' + used + '件の記録があります。店を削除しても記録は残りますが、店ごとの集計からは外れます。削除しますか？'
+    : 'この店を削除しますか？';
+  if (!confirm(msg)) return;
+  persistShops(loadShops().filter(s2 => s2.id !== id));
+  if (editingShopId === id) cancelShopEdit();
+  renderShops();
+  refreshShopSelect();
+  showMsg('店を削除しました');
+}
+
+// ②の店名プルダウンを最新の店マスタで作り直す（選択中の店はできるだけ維持）
+function refreshShopSelect() {
+  const sel = document.getElementById('recShop');
+  if (!sel) return;
+  const keep = sel.value;
+  const shops = loadShops();
+  let html = '<option value="">（未選択）</option>';
+  shops.forEach(s => {
+    html += '<option value="' + s.id + '">' + esc(s.name) +
+      (s.units ? '（' + s.units + '台）' : '') + '</option>';
+  });
+  sel.innerHTML = html;
+  if (keep && shops.some(s => String(s.id) === keep)) sel.value = keep;
+  document.getElementById('noShopHint').style.display = shops.length ? 'none' : 'block';
+}
+
+// ===== ② 記録保存 =====
+let recordsCache = null;
+const writeRecords = makeWriter(STORAGE_KEY);
+function loadRecords() {
+  if (!recordsCache) recordsCache = readStore(STORAGE_KEY);
+  return recordsCache;
+}
+function persist(records) { recordsCache = records; writeRecords(records); }
+// 支出・収入から差額をリアルタイム表示
+function updateDiff() {
+  const exp = parseInt(document.getElementById('recExpense').value, 10);
+  const inc = parseInt(document.getElementById('recIncome').value, 10);
+  const e = document.getElementById('recDiff');
+  if (isNaN(exp) && isNaN(inc)) { e.textContent = '¥0'; e.className = 'num'; return; }
+  const diff = (isNaN(inc) ? 0 : inc) - (isNaN(exp) ? 0 : exp);
+  e.textContent = fmtYen(diff);
+  e.className = 'num ' + (diff >= 0 ? 'pos' : 'neg');
+}
+function saveRecord() {
+  const date = document.getElementById('recDate').value;
+  const start = document.getElementById('recStart').value;
+  const end = document.getElementById('recEnd').value;
+  const shopId = document.getElementById('recShop').value;
+  const machine = document.getElementById('recMachine').value.trim();
+  const expRaw = document.getElementById('recExpense').value;
+  const incRaw = document.getElementById('recIncome').value;
+  if (!lastCalc) { showMsg('先に①で回転数・REGを入力してください'); return; }
+  if (!date) { showMsg('日付を入力してください'); return; }
+  if (expRaw === '' && incRaw === '') { showMsg('支出・収入を入力してください'); return; }
+  const expense = expRaw === '' ? 0 : parseInt(expRaw, 10);
+  const income = incRaw === '' ? 0 : parseInt(incRaw, 10);
+  if (isNaN(expense) || isNaN(income)) { showMsg('支出・収入は数字で入力してください'); return; }
+  if (expense < 0 || income < 0) { showMsg('支出・収入は0以上で入力してください'); return; }
+
+  const shop = shopId ? shopById(parseInt(shopId, 10)) : null;
+  const records = loadRecords();
+  records.unshift({ id: Date.now(), date, start, end,
+    shopId: shop ? shop.id : null, shopName: shop ? shop.name : '',
+    machine: machine, note: [shop ? shop.name : '', machine].filter(Boolean).join(' '),
+    expense: expense, income: income, profit: income - expense,
+    games: lastCalc.games, big: lastCalc.big, reg: lastCalc.reg,
+    regDenom: lastCalc.regDenom, budouDenom: lastCalc.budouDenom,
+    verdict: lastCalc.verdict, conf: lastCalc.conf,
+    lineRegLine: settings.regLine, lineThreshold: settings.threshold });
+  persist(records); render();
+  document.getElementById('recMachine').value = '';
+  document.getElementById('recExpense').value = '';
+  document.getElementById('recIncome').value = '';
+  document.getElementById('recStart').value = '';
+  document.getElementById('recEnd').value = '';
+  updateDiff();
+  showMsg('記録しました');
+}
+function deleteRecord(id) {
+  persist(loadRecords().filter(r => r.id !== id)); render();
+}
+
+// ===== 移動・拘束記録 =====
+let movesCache = null;
+const writeMoves = makeWriter(MOVE_KEY);
+function loadMoves() {
+  if (!movesCache) movesCache = readStore(MOVE_KEY);
+  return movesCache;
+}
+function persistMoves(moves) { movesCache = moves; writeMoves(moves); }
+function saveMove() {
+  const date = document.getElementById('moveDate').value;
+  const start = document.getElementById('moveStart').value;
+  const end = document.getElementById('moveEnd').value;
+  const fareRaw = document.getElementById('moveFare').value;
+  if (!date) { showMsg('日付を入力してください'); return; }
+  if (!start || !end) { showMsg('移動開始・終了を入力してください'); return; }
+  const fare = fareRaw === '' ? 0 : parseInt(fareRaw, 10);
+  if (isNaN(fare) || fare < 0) { showMsg('交通費は0以上の数で入力してください'); return; }
+  const moves = loadMoves();
+  moves.unshift({ id: Date.now(), date, start, end, fare: fare });
+  persistMoves(moves); render();
+  document.getElementById('moveStart').value = '';
+  document.getElementById('moveEnd').value = '';
+  document.getElementById('moveFare').value = '';
+  showMsg('拘束時間を記録しました');
+}
+function deleteMove(id) {
+  persistMoves(loadMoves().filter(m => m.id !== id)); render();
+}
+function totalMoveMinutes() {
+  let sum = 0;
+  loadMoves().forEach(m => {
+    let mins = toMin(m.end) - toMin(m.start);
+    if (mins < 0) mins += 24 * 60;
+    sum += mins;
+  });
+  return sum;
+}
+function totalFare() {
+  return loadMoves().reduce((s, m) => s + (Number(m.fare) || 0), 0);
+}
+
+// 指定した線（regLine/threshold）で打った直近区間の台数・日数を数える
+// 引数省略時は現在のsettingsの線
+function currentSegmentStats(regLine, threshold) {
+  const rl = (regLine === undefined) ? settings.regLine : regLine;
+  const th = (threshold === undefined) ? settings.threshold : threshold;
+  const records = loadRecords(); // 新しい順
+  let count = 0;
+  const days = new Set();
+  for (const r of records) {
+    if (r.lineRegLine === rl && r.lineThreshold === th) {
+      count++;
+      if (r.date) days.add(r.date);
+    } else {
+      break;
+    }
+  }
+  return { count: count, days: days.size };
+}
+
+// "HH:MM" を分に変換
+function toMin(t) {
+  if (!t) return 0;
+  const p = t.split(':');
+  return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+}
+
+// ===== ③ 表示 =====
+function fmtYen(n) { return (n >= 0 ? '+¥' : '-¥') + Math.abs(n).toLocaleString(); }
+function fmtDur(mins) { return Math.floor(mins / 60) + 'h' + String(mins % 60).padStart(2, '0'); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function lineKey(r) {
+  // 記録に刻まれたライン。古い記録（未刻印）は「不明」区間に
+  if (r.lineRegLine == null || r.lineThreshold == null) return 'unknown';
+  return '1/' + r.lineRegLine + '・' + r.lineThreshold + 'G';
+}
+// 記録の店・台番号の表示用テキスト（旧形式のnoteにも対応）
+function recPlace(r) {
+  const parts = [];
+  if (r.shopName) parts.push(r.shopName);
+  else if (!r.shopId && r.note) return r.note;
+  if (r.machine) parts.push(r.machine + '番');
+  return parts.join(' ');
+}
+
+function render() {
+  const records = loadRecords(); // 新しい順
+  const list = document.getElementById('recList');
+  document.getElementById('emptyMsg').style.display = records.length ? 'none' : 'block';
+  list.innerHTML = '';
+
+  let total = 0, wins = 0, playMin = 0;
+
+  // ライン設定が連続して同じ記録をひとつの「区間」にまとめる（時系列）
+  let curKey = null, segProfit = 0, segWins = 0, segCount = 0;
+
+  function flushSegment() {
+    if (segCount === 0) return;
+    const tr = document.createElement('tr');
+    tr.className = 'segRow';
+    const pc = segProfit >= 0 ? 'pos' : 'neg';
+    const winRate = Math.round(segWins / segCount * 100);
+    tr.innerHTML = '<td colspan="7" style="text-align:left;padding:6px;background:var(--gray-bg);' +
+      'font-size:11px;color:var(--sub);border-radius:6px;">' +
+      '区間小計【' + curKey + '】 ' + segCount + '台 ／ 勝率' + winRate + '% ／ ' +
+      '<span class="' + pc + '" style="font-weight:600;">' + fmtYen(segProfit) + '</span></td>';
+    list.appendChild(tr);
+    segProfit = 0; segWins = 0; segCount = 0;
+  }
+
+  records.forEach(r => {
+    total += r.profit;
+    if (r.profit > 0) wins++;
+    const k = lineKey(r);
+    // 区間の切れ目：ライン設定が変わったら、直前区間の小計を出す
+    if (curKey !== null && k !== curKey) flushSegment();
+    curKey = k;
+    segProfit += r.profit;
+    if (r.profit > 0) segWins++;
+    segCount++;
+
+    const tr = document.createElement('tr');
+    const pc = r.profit >= 0 ? 'pos' : 'neg';
+    const regTxt = r.regDenom ? '1/' + r.regDenom.toFixed(0) : '-';
+    let timeTxt = '-';
+    if (r.start && r.end) {
+      let mins = toMin(r.end) - toMin(r.start);
+      if (mins < 0) mins += 24 * 60;
+      playMin += mins;
+      timeTxt = fmtDur(mins);
+    }
+    const place = recPlace(r);
+    const placeTxt = place ? '<span class="sub-cell">' + esc(place) + '</span>' : '';
+    let profitTxt = fmtYen(r.profit);
+    if (r.expense != null && r.income != null) {
+      profitTxt += '<span class="sub-cell">支' + Number(r.expense).toLocaleString() +
+        ' / 収' + Number(r.income).toLocaleString() + '</span>';
+    }
+    tr.innerHTML = '<td>' + r.date.slice(5) + placeTxt + '</td><td>' + timeTxt +
+      '</td><td>' + r.games.toLocaleString() +
+      '</td><td>' + regTxt + '</td><td>' + r.verdict + '</td>' +
+      '<td class="' + pc + '">' + profitTxt +
+      '</td><td><span class="del" onclick="deleteRecord(' + r.id + ')">削除</span></td>';
+    list.appendChild(tr);
+  });
+  flushSegment(); // 最後の区間
+
+  // ===== サマリー =====
+  document.getElementById('sumCount').textContent = records.length;
+  document.getElementById('sumWin').textContent =
+    records.length ? Math.round(wins / records.length * 100) + '%' : '-';
+  const te = document.getElementById('sumTotal');
+  te.textContent = fmtYen(total); te.className = 'num ' + (total >= 0 ? 'pos' : 'neg');
+
+  // 交通費と最終収支
+  const fare = totalFare();
+  document.getElementById('sumFare').textContent = (fare > 0 ? '-¥' : '¥') + fare.toLocaleString();
+  const net = total - fare;
+  const ne = document.getElementById('sumNet');
+  ne.textContent = fmtYen(net); ne.className = 'num ' + (net >= 0 ? 'pos' : 'neg');
+
+  // 拘束時給（最終収支 ÷ 移動記録の総拘束時間）
+  const moveMin = totalMoveMinutes();
+  const he = document.getElementById('sumHourly');
+  if (moveMin > 0) {
+    const hourly = Math.round(net / (moveMin / 60));
+    he.textContent = fmtYen(hourly); he.className = 'num ' + (hourly >= 0 ? 'pos' : 'neg');
+  } else if (playMin > 0) {
+    // 移動記録がなければ実働ベースで暫定表示
+    const hourly = Math.round(net / (playMin / 60));
+    he.textContent = fmtYen(hourly) + '*'; he.className = 'num ' + (hourly >= 0 ? 'pos' : 'neg');
+  } else {
+    he.textContent = '-'; he.className = 'num';
+  }
+
+  renderLineSummary(records);
+  renderMoveList();
+  renderTightLineWarning(records);
+  renderShops();
+}
+
+// 通った日数のわりに打てた台数が少ない → ラインが厳しすぎるサイン
+function renderTightLineWarning(records) {
+  const box = document.getElementById('tightWarn');
+  if (!box) return;
+  const moveDays = new Set(loadMoves().map(m => m.date)).size;
+  const playedCount = records.length;
+  // 3日以上通っていて、打てた台数が通った日数より少ない（＝1日1台未満）
+  if (moveDays >= DAYS_THRESHOLD && playedCount < moveDays) {
+    box.style.display = 'block';
+    box.innerHTML = moveDays + '日通って、打てたのは' + playedCount + '台。' +
+      'ラインが厳しすぎて座れる台が少ない可能性があります。' +
+      '空振りが続くなら、ラインを少し甘い側に見直すことも検討を。';
+  } else {
+    box.style.display = 'none';
+    box.innerHTML = '';
+  }
+}
+
+function renderMoveList() {
+  const moves = loadMoves();
+  const wrap = document.getElementById('moveListWrap');
+  const list = document.getElementById('moveList');
+  if (!wrap || !list) return;
+  if (moves.length === 0) { wrap.style.display = 'none'; list.innerHTML = ''; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = '';
+  moves.forEach(m => {
+    let mins = toMin(m.end) - toMin(m.start);
+    if (mins < 0) mins += 24 * 60;
+    const fare = Number(m.fare) || 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + m.date.slice(5) + '</td>' +
+      '<td>' + m.start + '〜' + m.end + '</td>' +
+      '<td>' + fmtDur(mins) + '</td>' +
+      '<td>' + (fare ? '交通費 ¥' + fare.toLocaleString() : '-') + '</td>' +
+      '<td style="text-align:right;"><span class="del" onclick="deleteMove(' + m.id + ')">削除</span></td>';
+    list.appendChild(tr);
+  });
+}
+
+// 同じライン設定ごとの合算（参考・時期の違いに注意）
+function renderLineSummary(records) {
+  const box = document.getElementById('lineSummary');
+  if (!box) return;
+  if (records.length === 0) { box.innerHTML = ''; return; }
+  const byLine = {};
+  records.forEach(r => {
+    const k = lineKey(r);
+    if (!byLine[k]) byLine[k] = { profit: 0, count: 0, wins: 0 };
+    byLine[k].profit += r.profit;
+    byLine[k].count++;
+    if (r.profit > 0) byLine[k].wins++;
+  });
+  const keys = Object.keys(byLine);
+  if (keys.length <= 1) { box.innerHTML = ''; return; } // 1種類なら参考不要
+  let html = '<div style="font-size:12px;color:var(--sub);margin:14px 0 8px;">' +
+    '同じライン設定ごとの合算（参考）<br>' +
+    '<span style="opacity:.75;">※同じ設定でも打った時期・腕が違う点に注意。主役は上の時系列区間です。</span></div>';
+  keys.forEach(k => {
+    const d = byLine[k];
+    const pc = d.profit >= 0 ? 'pos' : 'neg';
+    html += '<div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line);">' +
+      '<span>' + k + '（' + d.count + '台・勝率' + Math.round(d.wins / d.count * 100) + '%）</span>' +
+      '<span class="' + pc + '" style="font-weight:600;">' + fmtYen(d.profit) + '</span></div>';
+  });
+  box.innerHTML = html;
+}
+
+// ===== 店管理タブ：一覧＋店ごとの成績 =====
+function shopStats() {
+  const by = {};
+  loadRecords().forEach(r => {
+    if (r.shopId == null) return;
+    if (!by[r.shopId]) by[r.shopId] = { count: 0, wins: 0, profit: 0 };
+    by[r.shopId].count++;
+    by[r.shopId].profit += r.profit;
+    if (r.profit > 0) by[r.shopId].wins++;
+  });
+  return by;
+}
+function renderShops() {
+  const box = document.getElementById('shopList');
+  const empty = document.getElementById('shopEmpty');
+  if (!box) return;
+  const shops = loadShops();
+  empty.style.display = shops.length ? 'none' : 'block';
+  const stats = shopStats();
+  let html = '';
+  shops.forEach(s => {
+    const d = stats[s.id];
+    let statHtml;
+    if (d) {
+      const pc = d.profit >= 0 ? 'pos' : 'neg';
+      statHtml = '<div class="stat"><span>打った台数 <b>' + d.count + '台</b></span>' +
+        '<span>勝率 <b>' + Math.round(d.wins / d.count * 100) + '%</b></span>' +
+        '<span>収支 <b class="' + pc + '">' + fmtYen(d.profit) + '</b></span></div>';
+    } else {
+      statHtml = '<div class="stat"><span>まだこの店の記録はありません</span></div>';
+    }
+    html += '<div class="shopItem">' +
+      '<div class="nm"><span>' + esc(s.name) + '</span>' +
+      '<span class="acts"><span class="edit" onclick="editShop(' + s.id + ')">編集</span>' +
+      '<span class="del" onclick="deleteShop(' + s.id + ')">削除</span></span></div>' +
+      '<div class="meta">マイジャグラーV ' + (s.units ? s.units + '台設置' : '設置台数未登録') + '</div>' +
+      (s.memo ? '<div class="memo">' + esc(s.memo) + '</div>' : '') +
+      statHtml + '</div>';
+  });
+  box.innerHTML = html;
+}
+
+// ===== 補助 =====
+let msgTimer = null;
+function showMsg(text) {
+  clearTimeout(msgTimer);
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'toast';
+    el.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2c2c2a;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9;';
+    document.body.appendChild(el);
+  }
+  el.textContent = text; el.style.display = 'block';
+  msgTimer = setTimeout(() => { el.style.display = 'none'; }, 1800);
+}
+function exportData() {
+  const records = loadRecords();
+  const moves = loadMoves();
+  const markers = loadMarkers();
+  const shops = loadShops();
+  if (!records.length && !moves.length && !shops.length) { showMsg('記録がありません'); return; }
+  const blob = new Blob([JSON.stringify({settings, records, moves, markers, shops}, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'myjuggler_records_' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// 初期化
+applySettingsToInputs();
+document.getElementById('recDate').valueAsDate = new Date();
+document.getElementById('moveDate').valueAsDate = new Date();
+refreshShopSelect();
+updateDiff();
+render();
+</script>
+</body>
+</html>
