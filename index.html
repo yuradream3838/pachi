@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>マイジャグラーV 設定推測ツール v1.6</title>
+<title>マイジャグラーV 設定推測ツール v1.7</title>
 <style>
   :root {
     --bg: #f4f2ec; --card: #ffffff; --ink: #2c2c2a; --sub: #6b6a64; --line: #ddd9cf;
@@ -63,6 +63,8 @@
   .settings .note { font-size:11px; color:var(--sub); margin:0 0 10px; }
   .row2 { display:flex; gap:10px; }
   .row2 > .field { flex:1; }
+  .btnRow { display:flex; gap:10px; margin-top:16px; }
+  .btnRow button { flex:1; margin-top:0; }
   .lineBar { background:var(--teal); color:#fff; border-radius:12px; padding:12px 16px; margin-bottom:16px; }
   .lineBar .ttl { font-size:11px; opacity:.85; margin-bottom:4px; }
   .lineBar .vals { font-size:14px; font-weight:600; display:flex; flex-wrap:wrap; gap:14px; }
@@ -101,7 +103,7 @@
 <body>
 <div class="wrap">
   <h1>マイジャグラーV 設定推測ツール</h1>
-  <p class="lead">v1.6 ／ 「線を引き、結果で線を引き直す」</p>
+  <p class="lead">v1.7 ／ 「線を引き、結果で線を引き直す」</p>
 
   <!-- タブ -->
   <div class="tabs">
@@ -221,7 +223,12 @@
       <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">移動・拘束の記録</div>
       <table><tbody id="moveList"></tbody></table>
     </div>
-    <button class="btn-ghost" style="margin-top:16px;" onclick="exportData()">データを書き出す（バックアップ）</button>
+    <div class="btnRow">
+      <button class="btn-ghost" onclick="exportData()">書き出す（バックアップ）</button>
+      <button class="btn-ghost" onclick="document.getElementById('importFile').click()">読み込む（復元）</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none;" onchange="handleImportFile(event)">
+    <p class="disclaimer">機種変更やデータ消失に備えて、ときどき書き出しておいてください。読み込みは「追加」か「置き換え」を選べます。</p>
   </div>
 
   </div><!-- /tabPlay -->
@@ -255,6 +262,18 @@
   </div><!-- /tabShop -->
 
   <p class="disclaimer">パチスロは長期的には店側が利益を出す設計です。このツールは不利を減らす立ち回りの補助であり、勝ちを保証するものではありません。</p>
+</div>
+
+<div class="modalBg" id="importModal">
+  <div class="modal">
+    <h3>読み込むデータ</h3>
+    <p id="importText"></p>
+    <div class="btns" style="flex-direction:column;">
+      <button class="btn-primary" onclick="runImport('merge')">いまの記録に追加する</button>
+      <button class="btn-ghost" onclick="runImport('replace')">すべて置き換える</button>
+      <button class="btn-ghost" onclick="closeImport()">やめる</button>
+    </div>
+  </div>
 </div>
 
 <div class="modalBg" id="confirmModal">
@@ -1006,6 +1025,202 @@ function exportData() {
   const a = document.createElement('a');
   a.href = url; a.download = 'myjuggler_records_' + new Date().toISOString().slice(0, 10) + '.json';
   a.click(); URL.revokeObjectURL(url);
+}
+
+// ===== データの読み込み（復元）=====
+let pendingImport = null;
+
+function num(v, def) {
+  if (v === null || v === undefined || v === '') return def;
+  const n = Number(v);
+  return isFinite(n) ? n : def;
+}
+function isDate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s); }
+function isTime(s) { return typeof s === 'string' && /^\d{1,2}:\d{2}$/.test(s); }
+function str(v) { return typeof v === 'string' ? v : ''; }
+// 既存のidとぶつからない新しいidを作る
+function nextId(list) {
+  let id = Date.now();
+  const used = new Set(list.map(x => x.id));
+  while (used.has(id)) id++;
+  return id;
+}
+// 新しい順（日付降順→id降順）に揃える。区間集計が新しい順を前提にしているため
+function sortByDateDesc(arr) {
+  return arr.slice().sort((a, b) =>
+    a.date === b.date ? num(b.id, 0) - num(a.id, 0) : (a.date < b.date ? 1 : -1));
+}
+
+function sanitizeShop(s, seedList) {
+  if (!s || !str(s.name).trim()) return null;
+  return { id: num(s.id, 0) || nextId(seedList),
+    name: str(s.name).trim(),
+    units: num(s.units, null),
+    memo: str(s.memo) };
+}
+function sanitizeRecord(r) {
+  if (!r || !isDate(r.date)) return null;
+  const games = num(r.games, 0);
+  if (!(games > 0)) return null;
+  const expense = num(r.expense, null);
+  const income = num(r.income, null);
+  let profit = num(r.profit, null);
+  if (profit === null) {
+    if (expense === null || income === null) return null; // 収支が復元できない行は捨てる
+    profit = income - expense;
+  }
+  const reg = num(r.reg, 0);
+  let regDenom = num(r.regDenom, null);
+  if (regDenom === null && reg > 0) regDenom = games / reg;
+  return { id: num(r.id, 0) || Date.now(), date: r.date,
+    start: isTime(r.start) ? r.start : '', end: isTime(r.end) ? r.end : '',
+    shopId: num(r.shopId, null), shopName: str(r.shopName),
+    machine: str(r.machine), note: str(r.note),
+    expense: expense, income: income, profit: profit,
+    games: games, big: num(r.big, 0), reg: reg,
+    regDenom: regDenom, budouDenom: num(r.budouDenom, null),
+    verdict: str(r.verdict) || '保留', conf: num(r.conf, null),
+    lineRegLine: num(r.lineRegLine, null), lineThreshold: num(r.lineThreshold, null) };
+}
+function sanitizeMove(m) {
+  if (!m || !isDate(m.date) || !isTime(m.start) || !isTime(m.end)) return null;
+  const fare = num(m.fare, 0);
+  return { id: num(m.id, 0) || Date.now(), date: m.date, start: m.start, end: m.end,
+    fare: (fare >= 0 ? fare : 0) };
+}
+function sanitizeMarker(k) {
+  const rl = num(k && k.regLine, null), th = num(k && k.threshold, null);
+  if (rl === null || th === null) return null;
+  return { id: num(k.id, 0) || Date.now(), at: str(k.at), regLine: rl, threshold: th };
+}
+
+// 書き出しファイルを検証して整える。ツールのファイルでなければ null
+function normalizeImport(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const arr = v => Array.isArray(v) ? v : [];
+  const shops = [];
+  arr(data.shops).forEach(s => { const v = sanitizeShop(s, shops); if (v) shops.push(v); });
+  const records = arr(data.records).map(sanitizeRecord).filter(Boolean);
+  const moves = arr(data.moves).map(sanitizeMove).filter(Boolean);
+  const markers = arr(data.markers).map(sanitizeMarker).filter(Boolean);
+  if (!records.length && !moves.length && !shops.length) return null;
+  let st = null;
+  if (data.settings && typeof data.settings === 'object') {
+    const t = num(data.settings.threshold, null), r = num(data.settings.regLine, null);
+    if (t > 0 && r > 0) st = { threshold: t, regLine: r };
+  }
+  const dropped = arr(data.records).length - records.length + (arr(data.moves).length - moves.length);
+  return { shops, records, moves, markers, settings: st, dropped: dropped };
+}
+
+function handleImportFile(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = ''; // 同じファイルをもう一度選べるように戻す
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onerror = () => showMsg('ファイルを読めませんでした');
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); }
+    catch (e) { showMsg('JSONとして読み取れませんでした'); return; }
+    const parsed = normalizeImport(data);
+    if (!parsed) { showMsg('このツールの書き出しファイルではないようです'); return; }
+    pendingImport = parsed;
+    const dates = parsed.records.map(r => r.date).concat(parsed.moves.map(m => m.date)).sort();
+    let html = 'このファイルの中身：<br><b>台の記録 ' + parsed.records.length + '件</b> ／ ' +
+      '移動 ' + parsed.moves.length + '件 ／ 店 ' + parsed.shops.length + '件';
+    if (dates.length) html += '<br>期間：' + dates[0] + ' 〜 ' + dates[dates.length - 1];
+    if (parsed.dropped > 0) html += '<br><span style="color:var(--amber);">※内容が壊れた ' +
+      parsed.dropped + '件は取り込みません</span>';
+    html += '<br><br>「追加」は同じ記録を二重に取り込みません。' +
+      '「置き換え」は今の記録をすべて消してこのファイルの内容にします。';
+    document.getElementById('importText').innerHTML = html;
+    document.getElementById('importModal').classList.add('open');
+  };
+  reader.readAsText(file);
+}
+function closeImport() {
+  document.getElementById('importModal').classList.remove('open');
+  pendingImport = null;
+}
+
+function runImport(mode) {
+  const d = pendingImport;
+  document.getElementById('importModal').classList.remove('open');
+  pendingImport = null;
+  if (!d) return;
+
+  if (mode === 'replace') {
+    const cur = loadRecords().length + loadMoves().length + loadShops().length;
+    if (cur > 0 && !confirm('いまの記録（台' + loadRecords().length + '件・移動' +
+        loadMoves().length + '件・店' + loadShops().length + '件）をすべて消して置き換えます。\n' +
+        'OKを押すと、念のため今のデータを先に書き出します。')) { return; }
+    if (cur > 0) exportData(); // 置き換え前の自動バックアップ
+    persistShops(d.shops);
+    persist(sortByDateDesc(d.records));
+    persistMoves(sortByDateDesc(d.moves));
+    persistMarkers(d.markers);
+    if (d.settings) {
+      settings = Object.assign({}, DEFAULTS, d.settings);
+      try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); } catch (e) {}
+      applySettingsToInputs();
+    }
+    refreshShopSelect(); render(); calc();
+    showMsg('置き換えました（台' + d.records.length + '件）');
+    return;
+  }
+
+  // ===== 追加（マージ）=====
+  // 店：同名は既存にまとめ、idが衝突したら振り直して記録の参照を付け替える
+  const shops = loadShops().slice();
+  const idMap = {};
+  d.shops.forEach(s => {
+    const sameName = shops.find(x => x.name === s.name);
+    if (sameName) {
+      idMap[s.id] = sameName.id;
+      // 既存が空欄のところだけ補う（入力済みの内容は上書きしない）
+      if (sameName.units == null && s.units != null) sameName.units = s.units;
+      if (!sameName.memo && s.memo) sameName.memo = s.memo;
+      return;
+    }
+    let nid = s.id;
+    if (shops.some(x => x.id === nid)) nid = nextId(shops);
+    idMap[s.id] = nid;
+    shops.push(Object.assign({}, s, { id: nid }));
+  });
+
+  const records = loadRecords().slice();
+  const seenRec = new Set(records.map(r => r.id));
+  let addRec = 0, dupRec = 0;
+  d.records.forEach(r => {
+    if (seenRec.has(r.id)) { dupRec++; return; } // 同じファイルを二度読んでも増えない
+    const rec = Object.assign({}, r);
+    if (rec.shopId != null) {
+      // 取り込んだ店に対応づかないidは、別の店に誤って紐づくのを避けて外す
+      rec.shopId = (idMap[rec.shopId] != null) ? idMap[rec.shopId] : null;
+    }
+    records.push(rec); seenRec.add(rec.id); addRec++;
+  });
+
+  const moves = loadMoves().slice();
+  const seenMove = new Set(moves.map(m => m.id));
+  let addMove = 0;
+  d.moves.forEach(m => {
+    if (seenMove.has(m.id)) return;
+    moves.push(m); seenMove.add(m.id); addMove++;
+  });
+
+  const markers = loadMarkers().slice();
+  const seenMk = new Set(markers.map(k => k.id));
+  d.markers.forEach(k => { if (!seenMk.has(k.id)) { markers.push(k); seenMk.add(k.id); } });
+  markers.sort((a, b) => num(a.id, 0) - num(b.id, 0));
+
+  persistShops(shops);
+  persist(sortByDateDesc(records));
+  persistMoves(sortByDateDesc(moves));
+  persistMarkers(markers);
+  refreshShopSelect(); render();
+  showMsg('追加しました（台' + addRec + '件' + (dupRec ? '／重複' + dupRec + '件は除外' : '') + '）');
 }
 
 // 初期化
